@@ -79,9 +79,9 @@ compared against past rejection reasons, so write it as a failure mechanism \
 that could be recognized in a completely different domain.
 """
 
-# Seeded reasons sit ~0.29–0.59 apart. Above ~0.6 only fires on close matches;
-# below ~0.45 starts flagging unrelated ideas. Tune against live data.
-SIMILARITY_THRESHOLD = 0.60
+# No similarity threshold: measured true and false matches overlap (a false
+# pitch scored 0.714 against true matches at 0.696-0.706), because all abstract
+# failure-mode prose sits in a narrow band. verdict_gate() decides instead.
 
 
 def speculate_on_new_idea(idea_text: str) -> dict:
@@ -127,20 +127,63 @@ def find_closest_past_rejection(likely_flaw: str, top_k: int = 1) -> list[dict]:
     return list(collection.aggregate(pipeline))
 
 
-def check_new_idea(idea_text: str) -> dict:
-    """Speculate → embed flaw → vector search → thresholded match."""
-    speculation = speculate_on_new_idea(idea_text)
-    matches = find_closest_past_rejection(speculation["likely_flaw"])
+VERDICT_SYSTEM_PROMPT = """You are the gate that decides whether a new project idea repeats a past mistake.
 
-    best_match = matches[0] if matches else None
-    is_real_match = bool(best_match) and best_match["score"] >= SIMILARITY_THRESHOLD
+Vector search over past rejection reasons is a recall step only — it always returns its nearest candidates, even when nothing genuinely matches. Your job is precision: decide whether the new idea would actually fail for the SAME underlying reason as one of the candidates.
+
+Be strict. Reject a candidate if:
+- the resemblance is topical (both involve agents, both involve data) rather than a shared failure mechanism
+- the new idea shares the candidate's subject matter but not its flaw
+- you are merely picking the least-bad option — "none" is the right answer far more often than not
+
+Accept only when you could explain to the person who pitched it: "this fails for the same reason that one did, and here is the mechanism."
+
+Return JSON:
+{"match_index": <0-based index of the matching candidate, or -1 for none>,
+ "why": "<one sentence: the shared failure mechanism, or why none matched>"}"""
+
+
+def verdict_gate(idea_text: str, speculated_flaw: str, candidates: list[dict]) -> dict:
+    """Precision gate over the vector-search candidates.
+
+    Embedding similarity alone cannot separate real matches here — all
+    abstract failure-mode prose sits in a narrow similarity band — so an LLM
+    makes the final call over the top candidates.
+    """
+    if USE_MOCK:
+        return {"match_index": 0, "why": "mock verdict"}
+
+    listing = "\n".join(
+        f"[{i}] idea: {c['idea_summary']}\n    rejected because: {c['rejection_reason']}"
+        for i, c in enumerate(candidates)
+    )
+    prompt = (
+        f"NEW IDEA: {idea_text}\n"
+        f"ITS LIKELY FLAW (speculated): {speculated_flaw}\n\n"
+        f"PAST REJECTED IDEAS:\n{listing}"
+    )
+    parsed = json.loads(complete_json(VERDICT_SYSTEM_PROMPT, prompt))
+    return {"match_index": int(parsed.get("match_index", -1)),
+            "why": str(parsed.get("why", "")).strip()}
+
+
+def check_new_idea(idea_text: str) -> dict:
+    """Speculate -> embed flaw -> vector search (recall) -> LLM gate (precision)."""
+    speculation = speculate_on_new_idea(idea_text)
+    candidates = find_closest_past_rejection(speculation["likely_flaw"], top_k=3)
+
+    verdict = verdict_gate(idea_text, speculation["likely_flaw"], candidates)
+    idx = verdict["match_index"]
+    matched = candidates[idx] if 0 <= idx < len(candidates) else None
 
     return {
         "new_idea": idea_text,
         "speculated_mechanic": speculation["core_mechanic"],
         "speculated_flaw": speculation["likely_flaw"],
-        "match": best_match if is_real_match else None,
-        "raw_top_match": best_match,  # useful for tuning threshold live
+        "match": matched,
+        "verdict_why": verdict["why"],
+        "raw_top_match": candidates[0] if candidates else None,
+        "candidates": candidates,
     }
 
 
@@ -208,17 +251,16 @@ def display_match(result: dict):
 
     if result["match"]:
         m = result["match"]
-        print(f"⚠️  MATCH FOUND (score: {m['score']:.3f})")
+        print(f"⚠️  MATCH FOUND (retrieval score: {m['score']:.3f})")
         print(f"  Looks like: {m['idea_summary']}")
         print(f"  Which was rejected because: {m['rejection_reason']}")
-        print(f"  -> Same underlying flaw, different domain.")
+        print(f"  Shared flaw: {result['verdict_why']}")
     else:
         top = result["raw_top_match"]
         if top:
-            print(
-                f"No strong match (closest was {top['score']:.3f}, "
-                f"below threshold {SIMILARITY_THRESHOLD}). This looks genuinely new."
-            )
+            print("No match — this one looks genuinely new.")
+            print(f"  {result['verdict_why']}")
+            print(f"  (nearest was {top['score']:.3f}: {top['idea_summary'][:50]})")
         else:
             print("No past rejections in the database yet.")
     print("=" * 70)
