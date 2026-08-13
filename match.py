@@ -220,8 +220,8 @@ def log_human_feedback(result: dict, was_real_match: bool):
     doc = {
         "new_idea": result["new_idea"],
         "speculated_flaw": result["speculated_flaw"],
-        "matched_idea_id": match["_id"] if match else None,
-        "match_score": match["score"] if match else None,
+        "matched_idea_id": match.get("_id") if match else None,
+        "match_score": match.get("score") if match else None,
         "was_real_match": was_real_match,
         "created_at": datetime.now(timezone.utc),
     }
