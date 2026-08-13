@@ -91,3 +91,32 @@ Vector search index: `reason_vector_index` on `reason_embedding`, cosine, 1536 d
 
 Query side must embed the *speculated failure mode*, not the raw pitch —
 vectors live in reasoning-space, not idea-space.
+
+## Voice layer (ElevenLabs)
+
+Speak a pitch; hear the archive answer in two distinct voices.
+
+```bash
+.venv/bin/python demo.py                          # speak the pitch
+.venv/bin/python demo.py "typed pitch here"       # skip the mic
+USE_MOCK=1 .venv/bin/python demo.py "pitch"       # no Atlas needed
+```
+
+| File | What it does |
+|---|---|
+| `voice.py` | Scribe STT in, streaming TTS out, two-voice reveal |
+| `demo.py` | End-to-end: pitch -> match -> spoken verdict |
+
+**How it works.** `record_until_silence()` captures the pitch and ElevenLabs
+Scribe transcribes it, feeding `check_new_idea()` unchanged. On a match, a
+"reviewer" voice (Roger) reacts live — the line is written per-run by an LLM
+held to a dry, world-weary persona — then an "archive" voice (Matilda, flat
+settings) reads the stored `rejection_reason` back verbatim, so the system's
+memory audibly speaks in a voice of its own.
+
+TTS uses the **streaming** endpoint with `pcm_24000` output piped straight to
+the output device, so playback starts before generation completes (first audio
+typically 400-800ms). Raw PCM also means no `ffmpeg`/decoder dependency.
+
+Requires `ELEVENLABS_API_KEY` in `.env`. Recording needs microphone permission
+for your terminal.
