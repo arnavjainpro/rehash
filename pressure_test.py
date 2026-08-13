@@ -163,7 +163,7 @@ def run_mock_suite() -> bool:
     if r.status_code not in (503, 502, 400):
         passed = _fail("transcribe without usable audio/key", f"status={r.status_code}") or passed
     else:
-        _ok("transcribe guarded ({r.status_code})")
+        _ok(f"transcribe guarded ({r.status_code})")
 
     r = client.post("/api/reject", json={})
     if r.status_code != 400:
