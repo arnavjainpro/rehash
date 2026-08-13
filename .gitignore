@@ -3,3 +3,5 @@
 __pycache__/
 *.pyc
 .gstack/
+.live_server.log
+verdict.mp3

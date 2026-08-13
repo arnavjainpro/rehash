@@ -236,5 +236,8 @@ if __name__ == "__main__":
     # Match module reads USE_MOCK at import; keep process env consistent.
     if USE_MOCK:
         print("Running with USE_MOCK=1 (no live MongoDB / OpenRouter calls)")
+    else:
+        print("Running LIVE (MongoDB + OpenRouter from .env)")
+    port = int(os.environ.get("PORT", "5050"))
     # use_reloader=False avoids double-import quirks with USE_MOCK / clients.
-    app.run(host="127.0.0.1", port=5050, debug=True, use_reloader=False)
+    app.run(host="127.0.0.1", port=port, debug=True, use_reloader=False)

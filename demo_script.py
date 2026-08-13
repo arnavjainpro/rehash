@@ -142,10 +142,11 @@ def main():
         run_check(DEMO_CLEAR, expect_match=False)
 
     say(
-        "6. OPTIONAL VOICE (if ElevenLabs key works)",
-        "In a terminal: python3 demo.py \"<match pitch>\". "
-        "Reviewer voice reacts, archive voice reads the stored reason. "
-        "Skip if the key/mic is flaky — the UI alone is enough.",
+        "6. VOICE — SKIP BY DEFAULT",
+        "Do NOT run the two-voice reveal unless someone on the team has "
+        "personally heard it work end-to-end on this machine today. "
+        "If validated: python3 demo.py \"<match pitch>\". "
+        "Otherwise stay on the UI — the scripted skip is the safe default.",
     )
     pause()
 

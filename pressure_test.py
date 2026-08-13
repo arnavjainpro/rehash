@@ -29,7 +29,7 @@ def run_mock_suite() -> bool:
         sys.modules.pop(mod, None)
 
     from app import app
-    from match import check_new_idea
+    from match import MOCK_MATCH, check_new_idea, load_feedback_cautions
 
     client = app.test_client()
     passed = True
@@ -126,14 +126,25 @@ def run_mock_suite() -> bool:
         json={
             "new_idea": match_pitch,
             "speculated_flaw": "x",
-            "match": {"_id": "mock-1", "score": 0.9},
-            "was_real_match": True,
+            "match": {
+                "_id": "mock-1",
+                "idea_summary": "mock idea",
+                "rejection_reason": "mock reason",
+                "score": 0.9,
+            },
+            "was_real_match": False,
         },
     )
     if r.status_code != 200:
-        passed = _fail("POST /api/feedback", f"status={r.status_code}") or passed
+        passed = _fail("POST /api/feedback false-positive", f"status={r.status_code}") or passed
     else:
-        _ok("POST /api/feedback")
+        _ok("POST /api/feedback false-positive")
+
+    if load_feedback_cautions([dict(MOCK_MATCH)]) != []:
+        # mock mode must not hit Mongo
+        passed = _fail("load_feedback_cautions mock", "expected []") or passed
+    else:
+        _ok("load_feedback_cautions mock no-ops")
 
     r = client.post("/api/feedback", json={"new_idea": "x"})
     if r.status_code != 400:

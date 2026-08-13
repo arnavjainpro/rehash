@@ -23,14 +23,27 @@ USE_MOCK = os.environ.get("USE_MOCK") == "1"
 if not USE_MOCK:
     from config import (  # noqa: E402
         DB_NAME,
+        FEEDBACK_COLLECTION_NAME,
         VECTOR_INDEX_NAME,
         collection,
         complete_json,
+        complete_json_fast,
         embed,
         mongo_client,
+        traceable,
     )
+else:
+    FEEDBACK_COLLECTION_NAME = "match_feedback"
 
-FEEDBACK_COLLECTION_NAME = "match_feedback"
+    def traceable(func=None, **_kwargs):  # type: ignore[no-redef]
+        if func is not None and callable(func):
+            return func
+
+        def decorator(fn):
+            return fn
+
+        return decorator
+
 
 ELEVENLABS_API_KEY = os.environ.get("ELEVENLABS_API_KEY")
 ELEVENLABS_VOICE_ID = os.environ.get("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")
@@ -71,12 +84,14 @@ Return JSON with exactly two string fields:
 - "core_mechanic": what the idea actually DOES, stripped of domain-specific \
 wording, same style as: "logs an outcome, then recommends an action to a \
 human based on matching it to similar past outcomes"
-- "likely_flaw": the most likely underlying flaw this idea could have — \
-concrete and generalizable, not "it might not work". Something like: \
-"the value only exists in a narrow band between what's already tracked \
-elsewhere and what's too minor to matter". This text will be embedded and \
-compared against past rejection reasons, so write it as a failure mechanism \
-that could be recognized in a completely different domain.
+- "likely_flaw": the most likely STRUCTURAL reason a team would kill this \
+project — a failure mechanism that could be recognized in a completely \
+different domain. Prefer product-structure failures (e.g. "maintains a \
+parallel system to flag a problem that should be fixed at the source", \
+"single classification step with no compounding state — a feature not a \
+project", "crowded category where evaluators pattern-match before the \
+differentiator lands") over domain-operational details. This text will be \
+embedded and compared against past rejection reasons.
 """
 
 # No similarity threshold: measured true and false matches overlap (a false
@@ -84,11 +99,16 @@ that could be recognized in a completely different domain.
 # failure-mode prose sits in a narrow band. verdict_gate() decides instead.
 
 
+@traceable(name="speculate_on_new_idea")
 def speculate_on_new_idea(idea_text: str) -> dict:
-    """LLM guesses the new idea's mechanic + likely flaw, before any lookup."""
+    """LLM guesses the new idea's mechanic + likely flaw, before any lookup.
+
+    Uses the Fireworks fast path (falls back to OpenRouter) — this runs live
+    while someone is watching the demo.
+    """
     if USE_MOCK:
         return dict(MOCK_SPECULATION)
-    raw = complete_json(SPECULATE_SYSTEM_PROMPT, idea_text)
+    raw = complete_json_fast(SPECULATE_SYSTEM_PROMPT, idea_text)
     parsed = json.loads(raw)
     if "core_mechanic" not in parsed or "likely_flaw" not in parsed:
         raise ValueError(f"Expected core_mechanic + likely_flaw, got: {raw!r}")
@@ -98,6 +118,7 @@ def speculate_on_new_idea(idea_text: str) -> dict:
     }
 
 
+@traceable(name="find_closest_past_rejection")
 def find_closest_past_rejection(likely_flaw: str, top_k: int = 1) -> list[dict]:
     """Embed the speculated flaw and Atlas Vector Search stored reasons."""
     if USE_MOCK:
@@ -131,10 +152,13 @@ VERDICT_SYSTEM_PROMPT = """You are the gate that decides whether a new project i
 
 Vector search over past rejection reasons is a recall step only — it always returns its nearest candidates, even when nothing genuinely matches. Your job is precision: decide whether the new idea would actually fail for the SAME underlying reason as one of the candidates.
 
+Two ideas match when fixing one the same way would fix the other — shared failure *mechanism*, not shared topic. Example of a real match: a support-policy gap monitor and an incident-runbook gap monitor both die because if you can reliably detect the source doc is wrong, you should fix the doc rather than maintain a parallel flagging system.
+
 Be strict. Reject a candidate if:
 - the resemblance is topical (both involve agents, both involve data) rather than a shared failure mechanism
 - the new idea shares the candidate's subject matter but not its flaw
 - you are merely picking the least-bad option — "none" is the right answer far more often than not
+- HUMAN FEEDBACK below previously marked that archive item as a false pairing for a similar pitch — treat that as a strong caution against repeating the same false positive
 
 Accept only when you could explain to the person who pitched it: "this fails for the same reason that one did, and here is the mechanism."
 
@@ -156,12 +180,58 @@ def _mock_should_clear(idea_text: str) -> bool:
     return any(marker in text for marker in clear_markers)
 
 
+@traceable(name="load_feedback_cautions")
+def load_feedback_cautions(candidates: list[dict]) -> list[str]:
+    """Pull prior 'Not the same thing' votes for these archive items.
+
+    This is the No-Cold-Start learning loop: human corrections in
+    `match_feedback` change what the verdict gate sees next time.
+    """
+    if USE_MOCK or not candidates:
+        return []
+
+    ids: list = []
+    for c in candidates:
+        cid = c.get("_id")
+        if cid is None:
+            continue
+        ids.append(cid)
+        ids.append(str(cid))
+
+    if not ids:
+        return []
+
+    docs = list(
+        mongo_client[DB_NAME][FEEDBACK_COLLECTION_NAME]
+        .find(
+            {
+                "was_real_match": False,
+                "matched_idea_id": {"$in": ids},
+            }
+        )
+        .sort("created_at", -1)
+        .limit(8)
+    )
+
+    lines = []
+    for d in docs:
+        summary = d.get("matched_idea_summary") or str(d.get("matched_idea_id"))
+        pitch = (d.get("new_idea") or "")[:100]
+        lines.append(
+            f"- Humans rejected pairing pitch {pitch!r} with archive "
+            f"item {summary!r} (not the same failure mechanism)."
+        )
+    return lines
+
+
+@traceable(name="verdict_gate")
 def verdict_gate(idea_text: str, speculated_flaw: str, candidates: list[dict]) -> dict:
     """Precision gate over the vector-search candidates.
 
     Embedding similarity alone cannot separate real matches here — all
     abstract failure-mode prose sits in a narrow similarity band — so an LLM
-    makes the final call over the top candidates.
+    makes the final call over the top candidates, informed by prior human
+    feedback on false positives.
     """
     if USE_MOCK:
         if _mock_should_clear(idea_text):
@@ -184,16 +254,27 @@ def verdict_gate(idea_text: str, speculated_flaw: str, candidates: list[dict]) -
         f"[{i}] idea: {c['idea_summary']}\n    rejected because: {c['rejection_reason']}"
         for i, c in enumerate(candidates)
     )
+    cautions = load_feedback_cautions(candidates)
+    caution_block = (
+        "\n\nHUMAN FEEDBACK (prior false-positive corrections):\n" + "\n".join(cautions)
+        if cautions
+        else "\n\nHUMAN FEEDBACK: none on file for these candidates yet."
+    )
     prompt = (
         f"NEW IDEA: {idea_text}\n"
         f"ITS LIKELY FLAW (speculated): {speculated_flaw}\n\n"
         f"PAST REJECTED IDEAS:\n{listing}"
+        f"{caution_block}"
     )
     parsed = json.loads(complete_json(VERDICT_SYSTEM_PROMPT, prompt))
-    return {"match_index": int(parsed.get("match_index", -1)),
-            "why": str(parsed.get("why", "")).strip()}
+    return {
+        "match_index": int(parsed.get("match_index", -1)),
+        "why": str(parsed.get("why", "")).strip(),
+        "feedback_cautions_used": len(cautions),
+    }
 
 
+@traceable(name="check_new_idea")
 def check_new_idea(idea_text: str) -> dict:
     """Speculate -> embed flaw -> vector search (recall) -> LLM gate (precision)."""
     speculation = speculate_on_new_idea(idea_text)
@@ -211,16 +292,28 @@ def check_new_idea(idea_text: str) -> dict:
         "verdict_why": verdict["why"],
         "raw_top_match": candidates[0] if candidates else None,
         "candidates": candidates,
+        "feedback_cautions_used": verdict.get("feedback_cautions_used", 0),
     }
 
 
 def log_human_feedback(result: dict, was_real_match: bool):
-    """Log whether a human confirmed the match. Separate collection only."""
+    """Log whether a human confirmed the match. Separate collection only.
+
+    False-positive votes (`was_real_match=False`) are read back by
+    `load_feedback_cautions` on later checks — the archive learns.
+    """
     match = result.get("match") or result.get("raw_top_match")
     doc = {
         "new_idea": result["new_idea"],
+<<<<<<< HEAD
         "speculated_flaw": result["speculated_flaw"],
         "matched_idea_id": match.get("_id") if match else None,
+=======
+        "speculated_flaw": result.get("speculated_flaw"),
+        "matched_idea_id": match["_id"] if match else None,
+        "matched_idea_summary": match.get("idea_summary") if match else None,
+        "matched_rejection_reason": match.get("rejection_reason") if match else None,
+>>>>>>> 4da4010 (Close judge gaps: Fireworks/LangSmith paths and feedback-aware verdicts.)
         "match_score": match.get("score") if match else None,
         "was_real_match": was_real_match,
         "created_at": datetime.now(timezone.utc),
@@ -290,12 +383,14 @@ def display_match(result: dict):
             print(f"  (nearest was {top['score']:.3f}: {top['idea_summary'][:50]})")
         else:
             print("No past rejections in the database yet.")
+    if result.get("feedback_cautions_used"):
+        print(f"  (applied {result['feedback_cautions_used']} prior human correction(s))")
     print("=" * 70)
 
 
 if __name__ == "__main__":
     # USE_MOCK=1 python3 match.py  -> fully offline
-    # python3 match.py             -> live Atlas + OpenRouter
+    # python3 match.py             -> live Atlas + OpenRouter / Fireworks
     if USE_MOCK:
         print("(running in USE_MOCK mode -- no live MongoDB/OpenRouter calls)\n")
 
