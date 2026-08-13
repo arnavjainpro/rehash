@@ -305,15 +305,10 @@ def log_human_feedback(result: dict, was_real_match: bool):
     match = result.get("match") or result.get("raw_top_match")
     doc = {
         "new_idea": result["new_idea"],
-<<<<<<< HEAD
-        "speculated_flaw": result["speculated_flaw"],
-        "matched_idea_id": match.get("_id") if match else None,
-=======
         "speculated_flaw": result.get("speculated_flaw"),
-        "matched_idea_id": match["_id"] if match else None,
+        "matched_idea_id": match.get("_id") if match else None,
         "matched_idea_summary": match.get("idea_summary") if match else None,
         "matched_rejection_reason": match.get("rejection_reason") if match else None,
->>>>>>> 4da4010 (Close judge gaps: Fireworks/LangSmith paths and feedback-aware verdicts.)
         "match_score": match.get("score") if match else None,
         "was_real_match": was_real_match,
         "created_at": datetime.now(timezone.utc),
