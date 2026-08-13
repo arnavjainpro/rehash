@@ -143,6 +143,19 @@ Return JSON:
  "why": "<one sentence: the shared failure mechanism, or why none matched>"}"""
 
 
+def _mock_should_clear(idea_text: str) -> bool:
+    """Offline rehearsal helper: some pitches must produce a no-match path."""
+    text = idea_text.lower()
+    clear_markers = (
+        "workout",
+        "playlist",
+        "heart-rate",
+        "multiplication",
+        "licensed catalog",
+    )
+    return any(marker in text for marker in clear_markers)
+
+
 def verdict_gate(idea_text: str, speculated_flaw: str, candidates: list[dict]) -> dict:
     """Precision gate over the vector-search candidates.
 
@@ -151,7 +164,21 @@ def verdict_gate(idea_text: str, speculated_flaw: str, candidates: list[dict]) -
     makes the final call over the top candidates.
     """
     if USE_MOCK:
-        return {"match_index": 0, "why": "mock verdict"}
+        if _mock_should_clear(idea_text):
+            return {
+                "match_index": -1,
+                "why": (
+                    "No shared failure mechanism with anything on file — "
+                    "this looks genuinely new."
+                ),
+            }
+        return {
+            "match_index": 0,
+            "why": (
+                "Same failure mechanism: retrieval only fills the prompt and "
+                "never changes what the system does next."
+            ),
+        }
 
     listing = "\n".join(
         f"[{i}] idea: {c['idea_summary']}\n    rejected because: {c['rejection_reason']}"

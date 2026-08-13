@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>rehash</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="atmosphere" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <button type="button" class="brand" data-go="pitch" aria-label="rehash home">rehash</button>
+    <nav class="topnav">
+      <button type="button" class="nav-link" data-go="pitch">Pitch</button>
+      <button type="button" class="nav-link" data-go="archive">Archive</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Screen 1: pitch -->
+    <section id="view-pitch" class="view is-active" aria-label="Pitch">
+      <div class="pitch-stage">
+        <p class="brand-mark">rehash</p>
+        <h1 class="pitch-prompt">Pitch the idea.</h1>
+        <p class="pitch-sub">We’ll check whether it dies for a reason you’ve already killed.</p>
+
+        <form id="pitch-form" class="pitch-row" autocomplete="off">
+          <label class="sr-only" for="pitch-input">Idea pitch</label>
+          <textarea
+            id="pitch-input"
+            name="pitch"
+            rows="3"
+            placeholder="Describe the idea in one or two sentences…"
+            required
+          ></textarea>
+          <div class="pitch-actions">
+            <button type="button" id="mic-btn" class="icon-btn" aria-pressed="false" title="Speak the pitch">
+              <span class="mic-dot" aria-hidden="true"></span>
+              <span class="mic-label">Mic</span>
+            </button>
+            <button type="submit" class="primary-btn" id="check-btn">Check archive</button>
+          </div>
+        </form>
+
+        <div class="sample-row" aria-label="Demo pitches">
+          <span class="sample-label">Try a demo pitch</span>
+          <button
+            type="button"
+            class="sample-chip"
+            data-pitch="An agent that compares what support reps actually do against the official policy doc and flags the gaps."
+          >Should match</button>
+          <button
+            type="button"
+            class="sample-chip"
+            data-pitch="A tool that generates personalized workout playlists based on a runner’s pace and heart-rate zones, pulled from a licensed catalog."
+          >Should look new</button>
+        </div>
+
+        <p id="pitch-status" class="status-line" hidden></p>
+      </div>
+    </section>
+
+    <!-- Thinking -->
+    <section id="view-thinking" class="view" aria-live="polite" aria-label="Working">
+      <div class="thinking-stage">
+        <p class="thinking-label">Checking the archive</p>
+        <p class="thinking-detail" id="thinking-detail">Speculating failure mode</p>
+      </div>
+    </section>
+
+    <!-- Screen 2: verdict -->
+    <section id="view-verdict" class="view" aria-label="Verdict">
+      <article class="verdict-card" id="verdict-card">
+        <p class="reaction" id="reaction-line"></p>
+
+        <div id="match-block" hidden>
+          <p class="past-label">Filed under</p>
+          <h2 class="past-idea" id="past-idea"></h2>
+          <blockquote class="archive-quote" id="archive-quote"></blockquote>
+        </div>
+
+        <div id="nomatch-block" hidden>
+          <p class="past-label">Archive</p>
+          <h2 class="past-idea">No prior match.</h2>
+        </div>
+
+        <p class="verdict-why" id="verdict-why"></p>
+
+        <div class="feedback-row" id="feedback-row">
+          <button type="button" class="feedback-btn" data-feedback="true">Fair call</button>
+          <button type="button" class="feedback-btn ghost" data-feedback="false">Not the same thing</button>
+        </div>
+        <p id="feedback-status" class="status-line" hidden></p>
+
+        <button type="button" class="text-link" data-go="pitch">Pitch another</button>
+      </article>
+    </section>
+
+    <!-- Screen 3: archive -->
+    <section id="view-archive" class="view" aria-label="Archive">
+      <div class="archive-stage">
+        <header class="archive-header">
+          <h1>Archive</h1>
+          <p>Past rejections, stored by reason — not by topic.</p>
+          <label class="sr-only" for="archive-search">Search archive</label>
+          <input id="archive-search" type="search" placeholder="Search summaries or reasons…" />
+        </header>
+        <p id="archive-meta" class="status-line"></p>
+        <ul id="archive-list" class="archive-list"></ul>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
