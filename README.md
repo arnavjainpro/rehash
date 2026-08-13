@@ -10,41 +10,70 @@ matching on the reasoning catches that; matching on the idea text never would.
 
 A human always makes the final call. This flags patterns; it never auto-rejects.
 
-## This repo: Person A — extraction pipeline
+## Files
 
-Ingestion only (extract → embed → store). Person B builds the matching/query half
-against the same `hackathon.rejected_ideas` collection.
-
-| File | What it does |
-|---|---|
-| `config.py` | MongoDB + OpenAI clients, `embed()`, `complete_json()`, shared constants |
-| `extract.py` | `add_rejected_idea(idea_text, discussion_text)` — the pipeline |
-| `seed.py` | Populates 5 real rejected ideas (wipes collection first, safe to re-run) |
-| `create_index.py` | One-time Atlas Vector Search index creation |
-| `verify.py` | Prints stored documents to confirm embeddings landed |
+| File | Owner | What it does |
+|---|---|---|
+| `config.py` | shared | MongoDB + OpenRouter clients, `embed()`, `complete_json()`, constants |
+| `extract.py` | A | `add_rejected_idea(idea_text, discussion_text)` — extract → embed → store |
+| `seed.py` | A | Populates 5 real rejected ideas (wipes collection first, safe to re-run) |
+| `create_index.py` | A | One-time Atlas Vector Search index creation |
+| `verify.py` | A | Prints stored documents to confirm embeddings landed |
+| `match.py` | B | `check_new_idea(idea_text)` — speculate flaw → embed → vector search |
+| `TEST_CASES.md` | B | Ready-to-run pitches for live threshold tuning |
 
 ## Setup
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install pymongo openai python-dotenv
+.venv/bin/pip install pymongo openai python-dotenv requests
 
-cp .env.example .env   # then fill in MONGODB_URI and OPENAI_API_KEY
+cp .env.example .env   # fill in MONGODB_URI and OPENROUTER_API_KEY
 ```
 
-`.env` is gitignored — never commit real credentials.
+Everything routes through OpenRouter (`openai/text-embedding-3-small`,
+`openai/gpt-4o-mini`). `.env` is gitignored — never commit real credentials.
 
-## Run, in order
+Optional: `ELEVENLABS_API_KEY` enables voice narration of match verdicts in
+`match.py` (no-ops cleanly if unset).
+
+## Run Person A (seed), in order
 
 ```bash
 .venv/bin/python seed.py          # 1. extract + embed + insert 5 documents
-.venv/bin/python create_index.py  # 2. create reason_vector_index (needs docs to exist first)
+.venv/bin/python create_index.py  # 2. create reason_vector_index (needs docs first)
 .venv/bin/python verify.py        # 3. confirm 5 docs with 1536-dim embeddings
 ```
 
 Atlas builds the index asynchronously — give it ~1 minute before querying.
+(Index is already created on the shared cluster.)
 
-## Schema (shared contract with Person B — do not rename)
+## Run Person B (match)
+
+```bash
+# offline rehearsal (no creds / no seed needed):
+USE_MOCK=1 .venv/bin/python match.py
+
+# live, against seeded Atlas data:
+.venv/bin/python match.py
+```
+
+Or from a REPL / demo script:
+
+```python
+from match import check_new_idea, display_match
+display_match(check_new_idea("your pitch here"))
+```
+
+See `TEST_CASES.md` for nine pitches: same-flaw matches, no-match, and a
+false-positive stress test (similar wording, different flaw).
+
+**Threshold:** seeded reasons sit ~0.29–0.59 cosine apart. Default
+`SIMILARITY_THRESHOLD = 0.60` — above that only fires on close matches;
+below ~0.45 starts flagging unrelated ideas. Tune against live scores
+(`raw_top_match` is always returned).
+
+## Schema (do not rename)
 
 Database `hackathon`, collection `rejected_ideas`:
 
@@ -52,10 +81,13 @@ Database `hackathon`, collection `rejected_ideas`:
 {
   idea_summary:     string,
   core_mechanic:    string,
-  rejection_reason: string,
-  reason_embedding: float[1536],   # text-embedding-3-small, cosine
+  rejection_reason: string,          # this is what gets embedded
+  reason_embedding: float[1536],     # text-embedding-3-small, cosine
   created_at:       datetime
 }
 ```
 
 Vector search index: `reason_vector_index` on `reason_embedding`, cosine, 1536 dims.
+
+Query side must embed the *speculated failure mode*, not the raw pitch —
+vectors live in reasoning-space, not idea-space.
