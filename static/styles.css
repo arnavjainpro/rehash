@@ -164,41 +164,6 @@ main {
   max-width: 28rem;
 }
 
-.sample-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-  margin-top: 1.25rem;
-}
-
-.sample-label {
-  font-size: 0.8rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-  margin-right: 0.25rem;
-}
-
-.sample-chip {
-  font: inherit;
-  font-size: 0.9rem;
-  padding: 0.45rem 0.75rem;
-  border: 1px solid var(--line);
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.55);
-  color: var(--ink-soft);
-  cursor: pointer;
-  transition: border-color 160ms var(--ease), color 160ms var(--ease), background 160ms var(--ease);
-}
-
-.sample-chip:hover {
-  color: var(--ink);
-  border-color: rgba(26, 35, 50, 0.28);
-  background: rgba(255, 255, 255, 0.9);
-}
-
 .topnav {
   display: flex;
   gap: 1rem;

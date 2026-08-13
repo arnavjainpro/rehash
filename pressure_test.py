@@ -205,8 +205,6 @@ def run_mock_suite() -> bool:
         'data-go="archive"',
         'data-go="file"',
         'id="reject-form"',
-        "Should match",
-        "Should look new",
         "verdict-why",
     ):
         if needle not in html:

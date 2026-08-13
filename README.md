@@ -29,8 +29,8 @@ USE_MOCK=1 python3 app.py
 
 Open **http://127.0.0.1:5050**
 
-- Click **Should match** → Check archive  
-- Click **Should look new** → Check archive  
+- Type a pitch → **Check archive**
+- **File** a rejection to grow the archive
 - Open **Archive** to browse stored rejections  
 
 ```bash
@@ -106,7 +106,7 @@ LangSmith: every live step is `@traceable` (`speculate` → `embed` →
 
 | Screen | Purpose |
 |---|---|
-| **Pitch** | One text box + mic. Demo chips for reliability. |
+| **Pitch** | One text box + mic. |
 | **File** | Add a rejected idea + why it died → extract → embed → Mongo. |
 | **Verdict** | Reaction → archive quote → **shared flaw** (`verdict_why`). **Fair call** / **Not the same thing** → `match_feedback`. |
 | **Archive** | Searchable stored rejections. |

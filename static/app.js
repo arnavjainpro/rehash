@@ -52,14 +52,6 @@
     btn.addEventListener("click", () => showView(btn.dataset.go));
   });
 
-  document.querySelectorAll(".sample-chip").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      pitchInput.value = btn.dataset.pitch || "";
-      setStatus(pitchStatus, "Demo pitch loaded — hit Check archive.");
-      pitchInput.focus();
-    });
-  });
-
   function setStatus(el, text) {
     if (!text) {
       el.hidden = true;
