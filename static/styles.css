@@ -484,6 +484,66 @@ main {
   cursor: default;
 }
 
+/* ---- File rejection ---- */
+
+.file-stage {
+  max-width: 38rem;
+  padding-top: 0.5rem;
+}
+
+.file-title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(2.2rem, 5vw, 3rem);
+  margin: 0 0 0.35rem;
+}
+
+.file-sub {
+  margin: 0 0 1.5rem;
+  color: var(--ink-soft);
+}
+
+.reject-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.reject-form label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-top: 0.5rem;
+}
+
+.reject-form textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 5rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.72);
+  font: inherit;
+  font-size: 1.02rem;
+  color: var(--ink);
+  outline: none;
+}
+
+.reject-form textarea:focus {
+  border-color: rgba(15, 107, 92, 0.45);
+  box-shadow: 0 0 0 3px rgba(15, 107, 92, 0.12);
+}
+
+.reject-result {
+  margin-top: 1.75rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line);
+  animation: rise 420ms var(--ease) both;
+}
+
 /* ---- Archive ---- */
 
 .archive-stage {

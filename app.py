@@ -167,6 +167,41 @@ def api_feedback():
     return jsonify(_jsonable(doc))
 
 
+@app.post("/api/reject")
+def api_reject():
+    """File a rejected idea into the archive (Person A write path)."""
+    data = request.get_json(silent=True) or {}
+    idea = (data.get("idea") or data.get("idea_text") or "").strip()
+    discussion = (data.get("discussion") or data.get("discussion_text") or "").strip()
+    if not idea:
+        return jsonify({"error": "idea is required"}), 400
+    if not discussion:
+        return jsonify({"error": "discussion (why it was rejected) is required"}), 400
+    if len(idea) < 8 or len(discussion) < 8:
+        return jsonify({"error": "idea and discussion need a bit more detail"}), 400
+
+    if USE_MOCK:
+        doc = {
+            "_id": f"mock-{len(MOCK_ARCHIVE) + 1}",
+            "idea_summary": idea.split("\n")[0][:160],
+            "core_mechanic": (
+                "mock mechanic extracted from the idea without domain nouns"
+            ),
+            "rejection_reason": discussion.split("\n")[0][:400],
+            "created_at": datetime.now().astimezone().isoformat(),
+        }
+        MOCK_ARCHIVE.insert(0, doc)
+        return jsonify(_jsonable(doc))
+
+    from extract import add_rejected_idea
+
+    try:
+        doc = add_rejected_idea(idea, discussion)
+    except Exception as exc:
+        return jsonify({"error": f"extract/store failed: {exc}"}), 500
+    return jsonify(_jsonable(doc))
+
+
 @app.get("/api/archive")
 def api_archive():
     q = (request.args.get("q") or "").strip().lower()

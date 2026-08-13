@@ -163,7 +163,37 @@ def run_mock_suite() -> bool:
     if r.status_code not in (503, 502, 400):
         passed = _fail("transcribe without usable audio/key", f"status={r.status_code}") or passed
     else:
-        _ok(f"transcribe guarded ({r.status_code})")
+        _ok("transcribe guarded ({r.status_code})")
+
+    r = client.post("/api/reject", json={})
+    if r.status_code != 400:
+        passed = _fail("reject requires fields", f"status={r.status_code}") or passed
+    else:
+        _ok("reject requires fields")
+
+    r = client.post(
+        "/api/reject",
+        json={
+            "idea": "A widget that nags you to water plants via SMS.",
+            "discussion": (
+                "Killed because the value only exists in a narrow band "
+                "between what's already tracked elsewhere and what's too "
+                "minor to matter."
+            ),
+        },
+    )
+    data = r.get_json() or {}
+    if r.status_code != 200 or not data.get("rejection_reason"):
+        passed = _fail("POST /api/reject", str(data)[:200]) or passed
+    else:
+        _ok("POST /api/reject")
+
+    r = client.get("/api/archive")
+    data = r.get_json() or {}
+    if r.status_code != 200 or data.get("count", 0) < 3:
+        passed = _fail("archive grew after reject", str(data)[:200]) or passed
+    else:
+        _ok("archive grew after reject")
 
     print("\n== UI contract ==")
     html = client.get("/").data.decode("utf-8")
@@ -173,6 +203,8 @@ def run_mock_suite() -> bool:
         "Fair call",
         "Not the same thing",
         'data-go="archive"',
+        'data-go="file"',
+        'id="reject-form"',
         "Should match",
         "Should look new",
         "verdict-why",

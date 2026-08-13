@@ -3,6 +3,7 @@
     pitch: document.getElementById("view-pitch"),
     thinking: document.getElementById("view-thinking"),
     verdict: document.getElementById("view-verdict"),
+    file: document.getElementById("view-file"),
     archive: document.getElementById("view-archive"),
   };
 
@@ -24,6 +25,14 @@
   const archiveSearch = document.getElementById("archive-search");
   const archiveList = document.getElementById("archive-list");
   const archiveMeta = document.getElementById("archive-meta");
+  const rejectForm = document.getElementById("reject-form");
+  const rejectIdea = document.getElementById("reject-idea");
+  const rejectDiscussion = document.getElementById("reject-discussion");
+  const rejectBtn = document.getElementById("reject-btn");
+  const rejectStatus = document.getElementById("reject-status");
+  const rejectResult = document.getElementById("reject-result");
+  const rejectSummary = document.getElementById("reject-summary");
+  const rejectReason = document.getElementById("reject-reason");
 
   let lastResult = null;
   let mediaRecorder = null;
@@ -296,6 +305,35 @@
   }
 
   micBtn.addEventListener("click", toggleMic);
+
+  rejectForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const idea = rejectIdea.value.trim();
+    const discussion = rejectDiscussion.value.trim();
+    if (!idea || !discussion) return;
+    setStatus(rejectStatus, "Extracting reason and embedding…");
+    rejectResult.hidden = true;
+    rejectBtn.disabled = true;
+    try {
+      const res = await fetch("/api/reject", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idea, discussion }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Save failed (${res.status})`);
+      rejectSummary.textContent = data.idea_summary || idea;
+      rejectReason.textContent = data.rejection_reason || discussion;
+      rejectResult.hidden = false;
+      setStatus(rejectStatus, "Filed to the archive.");
+      rejectIdea.value = "";
+      rejectDiscussion.value = "";
+    } catch (err) {
+      setStatus(rejectStatus, err.message || "Could not file rejection.");
+    } finally {
+      rejectBtn.disabled = false;
+    }
+  });
 
   pitchInput.addEventListener("keydown", (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {

@@ -16,6 +16,7 @@
     <button type="button" class="brand" data-go="pitch" aria-label="rehash home">rehash</button>
     <nav class="topnav">
       <button type="button" class="nav-link" data-go="pitch">Pitch</button>
+      <button type="button" class="nav-link" data-go="file">File</button>
       <button type="button" class="nav-link" data-go="archive">Archive</button>
     </nav>
   </header>
@@ -98,6 +99,45 @@
 
         <button type="button" class="text-link" data-go="pitch">Pitch another</button>
       </article>
+    </section>
+
+    <!-- Screen: file a rejection -->
+    <section id="view-file" class="view" aria-label="File a rejection">
+      <div class="file-stage">
+        <h1 class="file-title">File a rejection.</h1>
+        <p class="file-sub">
+          Store the idea and why it died. We embed the reason — that’s what
+          future pitches get checked against.
+        </p>
+        <form id="reject-form" class="reject-form" autocomplete="off">
+          <label for="reject-idea">Idea</label>
+          <textarea
+            id="reject-idea"
+            name="idea"
+            rows="3"
+            placeholder="What was the idea?"
+            required
+          ></textarea>
+          <label for="reject-discussion">Why it was rejected</label>
+          <textarea
+            id="reject-discussion"
+            name="discussion"
+            rows="4"
+            placeholder="The real failure mechanism — concrete enough to recognize in another domain…"
+            required
+          ></textarea>
+          <div class="pitch-actions">
+            <button type="submit" class="primary-btn" id="reject-btn">Add to archive</button>
+          </div>
+        </form>
+        <p id="reject-status" class="status-line" hidden></p>
+        <div id="reject-result" class="reject-result" hidden>
+          <p class="past-label">Stored</p>
+          <h2 class="past-idea" id="reject-summary"></h2>
+          <blockquote class="archive-quote" id="reject-reason"></blockquote>
+          <button type="button" class="text-link" data-go="archive">View archive</button>
+        </div>
+      </div>
     </section>
 
     <!-- Screen 3: archive -->

@@ -107,6 +107,7 @@ LangSmith: every live step is `@traceable` (`speculate` → `embed` →
 | Screen | Purpose |
 |---|---|
 | **Pitch** | One text box + mic. Demo chips for reliability. |
+| **File** | Add a rejected idea + why it died → extract → embed → Mongo. |
 | **Verdict** | Reaction → archive quote → **shared flaw** (`verdict_why`). **Fair call** / **Not the same thing** → `match_feedback`. |
 | **Archive** | Searchable stored rejections. |
 
